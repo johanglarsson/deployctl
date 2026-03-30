@@ -160,7 +160,7 @@ func (o *OAuthAuth) buildAuthorizeURL(redirectURI, challenge, state string) stri
 		"client_id":             {o.cfg.GitLabClientID},
 		"redirect_uri":          {redirectURI},
 		"response_type":         {"code"},
-		"scope":                 {"read_user"},
+		"scope":                 {o.cfg.GitLabScope},
 		"code_challenge":        {challenge},
 		"code_challenge_method": {"S256"},
 		"state":                 {state},
@@ -250,27 +250,58 @@ func randomHex(n int) (string, error) {
 }
 
 // openBrowser attempts to open the given URL in the default browser.
-// Falls back silently if no browser is available (e.g. headless environments).
+// Falls back silently if no browser is available (e.g. headless servers).
+// The URL is always printed to stderr first so headless users can open it manually.
 func openBrowser(u string) {
 	var cmd string
 	var args []string
 
-	switch runtime.GOOS {
-	case "linux":
-		cmd = "xdg-open"
-		args = []string{u}
-	case "darwin":
+	switch {
+	case runtime.GOOS == "darwin":
 		cmd = "open"
 		args = []string{u}
-	case "windows":
-		cmd = "rundll32"
-		args = []string{"url.dll,FileProtocolHandler", u}
+
+	case runtime.GOOS == "windows":
+		// cmd /c start "" "<url>" — the empty string is the required window title;
+		// avoids rundll32 which breaks on URLs containing & or other shell chars.
+		cmd = "cmd"
+		args = []string{"/c", "start", "", u}
+
+	case runtime.GOOS == "linux" && isWSL():
+		// WSL: the process runs as Linux but the desktop is Windows.
+		// Prefer wslview (wslu package) then fall back to explorer.exe.
+		if path, err := exec.LookPath("wslview"); err == nil {
+			cmd = path
+			args = []string{u}
+		} else {
+			cmd = "explorer.exe"
+			args = []string{u}
+		}
+
+	case runtime.GOOS == "linux":
+		cmd = "xdg-open"
+		args = []string{u}
+
 	default:
 		return
 	}
 
 	if err := exec.Command(cmd, args...).Start(); err != nil {
-		// Headless / no browser — URL has already been printed to stderr
+		// No browser available — the URL was already printed to stderr above.
 		_ = err
 	}
+}
+
+// isWSL reports whether the process is running inside Windows Subsystem for Linux.
+func isWSL() bool {
+	if os.Getenv("WSL_DISTRO_NAME") != "" || os.Getenv("WSLENV") != "" {
+		return true
+	}
+	// Fallback: check /proc/version which contains "microsoft" on WSL kernels.
+	data, err := os.ReadFile("/proc/version")
+	if err != nil {
+		return false
+	}
+	lower := strings.ToLower(string(data))
+	return strings.Contains(lower, "microsoft") || strings.Contains(lower, "wsl")
 }

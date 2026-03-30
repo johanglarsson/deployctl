@@ -14,6 +14,7 @@ type Config struct {
 	GitLabURL          string `mapstructure:"gitlab_url"`
 	GitLabClientID     string `mapstructure:"gitlab_client_id"`
 	GitLabRedirectPort int    `mapstructure:"gitlab_redirect_port"`
+	GitLabScope        string `mapstructure:"gitlab_scope"`
 }
 
 const defaultRedirectPort = 9876
@@ -53,6 +54,9 @@ func Load(path string) (*Config, error) {
 
 	if cfg.GitLabRedirectPort == 0 {
 		cfg.GitLabRedirectPort = defaultRedirectPort
+	}
+	if cfg.GitLabScope == "" {
+		cfg.GitLabScope = "read_user"
 	}
 
 	return cfg, nil
