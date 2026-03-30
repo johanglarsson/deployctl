@@ -160,7 +160,7 @@ func (o *OAuthAuth) buildAuthorizeURL(redirectURI, challenge, state string) stri
 		"client_id":             {o.cfg.GitLabClientID},
 		"redirect_uri":          {redirectURI},
 		"response_type":         {"code"},
-		"scope":                 {"read_user"},
+		"scope":                 {o.cfg.GitLabScope},
 		"code_challenge":        {challenge},
 		"code_challenge_method": {"S256"},
 		"state":                 {state},
